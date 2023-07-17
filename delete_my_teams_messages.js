@@ -111,7 +111,7 @@ Works in July 2023 may not work in the future...
 
     if (last_processed < (new Date()).getTime() - 120000) {
       clearInterval(repeat);
-      console.log("Finished, nothing new has come up for 1 minute 15 seconds.");
+      console.log("Finished, nothing new has come up for 1 minute 20 seconds.");
     }
   }, 3000);
 })();
