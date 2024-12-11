@@ -1,0 +1,181 @@
+/*
+Delete Teams Messages v2.0
+By dsci4 
+https://github.com/dsci4-hacks
+Based on work by kiki67100 https://gist.github.com/kiki67100
+
+This works on the current Teams Web Version as of December 2024.
+Tested on Google Chrome 
+Open Microsoft teams web version, select a conversation
+Open Developper tools and copy / paste 
+
+It will delete messages from the conversation that is currently selected.
+Working in Dec 2024 - It may not work in the future.
+*/
+
+(function () {
+  console.log("[Automation Script] Script started.");
+
+  const processedMessages = new Set(); // Tracks all processed message IDs
+  const queue = [];
+  const retryMap = new Map(); // Tracks retries for message processing
+  let isProcessing = false;
+
+  const DELETE_INTERVAL_MS = 500; // Delay between deletions
+  const MAX_RETRIES = 3; // Maximum retries for failed messages
+
+  // Simulate mouse events
+  const simulateMouseEvent = (eventType, element) => {
+    const event = new MouseEvent(eventType, {
+      view: window,
+      bubbles: true,
+      cancelable: true,
+      buttons: 1,
+    });
+    element.dispatchEvent(event);
+  };
+
+  // Scroll up to load more messages
+  const scrollToLoadMessages = () => {
+    const scrollContainer = document.querySelector("div.fui-Primitive.f1yrx710.f1l02sjl"); // Update selector if needed
+    if (scrollContainer) {
+      scrollContainer.scrollBy({ top: -300, behavior: "auto" });
+      console.log("[Automation Script] Scrolled up.");
+    }
+  };
+
+  // Process a single message
+  const processMessage = async (messageElement) => {
+    if (!messageElement) return;
+
+    const messageId = messageElement.getAttribute("data-mid");
+
+    // Skip already-processed messages
+    if (processedMessages.has(messageId)) {
+      console.log(`[Automation Script] Skipping already-processed message ID: ${messageId}`);
+      return;
+    }
+
+    try {
+      // Highlight the message being processed
+      messageElement.style.outline = "3px solid blue";
+
+      const contentElement = messageElement.querySelector("p");
+      const content = contentElement ? contentElement.textContent.trim() : "(No Content)";
+      const isMine = Array.from(messageElement.classList).some((cls) => cls.includes("ChatMyMessage"));
+
+      console.log(`[Automation Script] Processing message ID: ${messageId}, Content: "${content}", Is it mine?: ${isMine}`);
+
+      if (!isMine) return;
+
+      const undoButton = messageElement.querySelector("[data-tid=message-undo-delete-btn]");
+      if (undoButton) {
+        console.log(`[Automation Script] Message ID: ${messageId} already deleted (Undo button detected).`);
+        processedMessages.add(messageId); // Mark message as processed
+        return;
+      }
+
+      const messageContentElement = document.querySelector(`#content-${messageId}`);
+      if (messageContentElement) {
+        simulateMouseEvent("contextmenu", messageContentElement);
+
+        const deleteOption = await new Promise((resolve, reject) => {
+          const interval = setInterval(() => {
+            const option = Array.from(document.querySelectorAll("div, span")).find(
+              (el) => el.textContent.trim().toLowerCase() === "delete"
+            );
+            if (option) {
+              clearInterval(interval);
+              resolve(option);
+            }
+          }, 100);
+          setTimeout(() => {
+            clearInterval(interval);
+            reject(new Error("Delete option not found."));
+          }, 5000);
+        });
+
+        simulateMouseEvent("click", deleteOption);
+        console.log(`[Automation Script] Deleted message ID: ${messageId}`);
+        processedMessages.add(messageId); // Mark message as processed
+
+        // Highlight as successfully deleted
+        messageElement.style.outline = "3px solid green";
+      }
+    } catch (error) {
+      console.error(`[Automation Script] Error processing message ID: ${messageId}`, error);
+
+      // Retry logic
+      const retries = retryMap.get(messageId) || 0;
+      if (retries < MAX_RETRIES) {
+        console.log(`[Automation Script] Retrying message ID: ${messageId} (Attempt ${retries + 1}/${MAX_RETRIES})`);
+        retryMap.set(messageId, retries + 1);
+        queue.push(messageElement);
+
+        // Highlight as failed
+        messageElement.style.outline = "3px solid red";
+      } else {
+        console.warn(`[Automation Script] Skipping message ID: ${messageId} after ${MAX_RETRIES} retries.`);
+        retryMap.delete(messageId);
+        processedMessages.add(messageId); // Mark message as processed to avoid reprocessing
+
+        // Highlight as permanently failed
+        messageElement.style.outline = "3px dashed red";
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, DELETE_INTERVAL_MS));
+  };
+
+  // Process the queue
+  const processQueue = async () => {
+    if (isProcessing) return;
+    isProcessing = true;
+
+    while (queue.length > 0) {
+      const messageElement = queue.shift();
+      await processMessage(messageElement);
+    }
+
+    console.log("[Automation Script] Queue is empty. Scrolling to load more messages...");
+    scrollToLoadMessages();
+    scanMessages();
+
+    isProcessing = false;
+  };
+
+  // Scan for new messages and add to queue
+  const scanMessages = () => {
+    const newMessages = Array.from(document.querySelectorAll("div[data-mid]"))
+      .reverse()
+      .filter((msg) => !queue.includes(msg) && !processedMessages.has(msg.getAttribute("data-mid")));
+
+    if (newMessages.length > 0) {
+      console.log(`[Automation Script] Found ${newMessages.length} new messages.`);
+      queue.push(...newMessages);
+    }
+  };
+
+  // Start the script
+  const startScript = () => {
+    console.log("[Automation Script] Starting...");
+    const observer = new MutationObserver(() => {
+      scanMessages();
+      if (!isProcessing) processQueue();
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    scanMessages();
+    processQueue();
+
+    setInterval(() => {
+      if (queue.length === 0 && !isProcessing) {
+        console.log("[Automation Script] Queue is empty. Scrolling to load more messages...");
+        scrollToLoadMessages();
+      }
+    }, 100); // Retry scrolling frequently if no messages in the queue
+  };
+
+  startScript();
+})();
