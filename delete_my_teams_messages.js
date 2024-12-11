@@ -1,4 +1,9 @@
+
 /*
+-------------------------
+This file has now been replaced by version 2.0:
+https://github.com/dsci4-hacks/Delete-Teams-Messages-Batch-Bulk-Delete/blob/main/Delete_Teams_Messages_v2.0
+-------------------------
 By 
 dsci4 https://github.com/dsci4-hacks
 Based on work by kiki67100 https://gist.github.com/kiki67100
