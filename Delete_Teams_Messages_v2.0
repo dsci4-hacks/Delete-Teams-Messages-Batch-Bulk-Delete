@@ -21,7 +21,7 @@ Working in Dec 2024 - It may not work in the future.
   const retryMap = new Map(); // Tracks retries for message processing
   let isProcessing = false;
 
-  const DELETE_INTERVAL_MS = 500; // Delay between deletions
+  const DELETE_INTERVAL_MS = 2000; // Delay between deletions
   const MAX_RETRIES = 3; // Maximum retries for failed messages
 
   // Simulate mouse events
